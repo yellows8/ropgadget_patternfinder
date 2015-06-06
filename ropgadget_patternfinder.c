@@ -106,6 +106,7 @@ int main(int argc, char **argv)
 	unsigned char *inhashptr;
 	size_t filebufsz=0, pos, hashblocksize=0;
 	unsigned int tmpsize=0;
+	unsigned int stride = 4;
 	struct stat filestat;
 	FILE *fbin;
 
@@ -119,6 +120,7 @@ int main(int argc, char **argv)
 		printf("Options:\n");
 		printf("--patternsha256=<bindata> Hash every --patternsha256size bytes in the binary, for locating the target pattern. The input bindata(sha256 hash) size must be 0x20-bytes.\n");
 		printf("--patternsha256size=0x<hexval> See --patternsha256.\n");
+		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
 
 		return 0;
 	}
@@ -147,6 +149,11 @@ int main(int argc, char **argv)
 		{
 			sscanf(&argv[argi][20], "0x%x", &tmpsize);
 			hashblocksize = tmpsize;
+		}
+
+		if(strncmp(argv[argi], "--stride=", 9)==0)
+		{
+			sscanf(&argv[argi][9], "0x%x", &stride);
 		}
 
 		if(ret!=0)break;
@@ -201,7 +208,7 @@ int main(int argc, char **argv)
 	found = 0;
 	ret = 0;
 
-	for(pos=0; pos<filebufsz; pos+=4)
+	for(pos=0; pos<filebufsz; pos+=stride)
 	{
 		if(filebufsz - pos < hashblocksize)break;
 
