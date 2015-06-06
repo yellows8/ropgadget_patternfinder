@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 	int argi;
 	int ret;
 	int hashpattern_set = 0;
-	int found;
+	unsigned int found, findtarget=1;
 	unsigned char *filebuf = NULL;
 	unsigned char inhash[0x20];
 	unsigned char calchash[0x20];
@@ -121,6 +121,7 @@ int main(int argc, char **argv)
 		printf("--patternsha256=<bindata> Hash every --patternsha256size bytes in the binary, for locating the target pattern. The input bindata(sha256 hash) size must be 0x20-bytes.\n");
 		printf("--patternsha256size=0x<hexval> See --patternsha256.\n");
 		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
+		printf("--findtarget=0x<hexval> Stop searching once this number of matches were found, by default this is 0x1. When this is 0x0, this will not stop until the end of the binary is reached.\n");
 
 		return 0;
 	}
@@ -154,6 +155,11 @@ int main(int argc, char **argv)
 		if(strncmp(argv[argi], "--stride=", 9)==0)
 		{
 			sscanf(&argv[argi][9], "0x%x", &stride);
+		}
+
+		if(strncmp(argv[argi], "--findtarget=", 13)==0)
+		{
+			sscanf(&argv[argi][13], "0x%x", &findtarget);
 		}
 
 		if(ret!=0)break;
@@ -215,8 +221,9 @@ int main(int argc, char **argv)
 		SHA256(&filebuf[pos], hashblocksize, calchash);
 		if(memcmp(inhash, calchash, 0x20)==0)
 		{
-			found = 1;
-			break;
+			printf("Found the pattern at 0x%x.\n", (unsigned int)pos);
+			found++;
+			if(found==findtarget)break;
 		}
 	}
 
@@ -227,7 +234,7 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		printf("Found the pattern at 0x%x.\n", (unsigned int)pos);
+		printf("Found 0x%x matches.\n", found);
 	}
 
 	free(filebuf);
