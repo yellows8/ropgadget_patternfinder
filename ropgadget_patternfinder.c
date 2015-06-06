@@ -107,6 +107,7 @@ int main(int argc, char **argv)
 	unsigned int tmpsize=0;
 	unsigned int stride = 4;
 	unsigned int tmpval, tmpval2;
+	unsigned int baseaddr = 0;
 	struct stat filestat;
 	FILE *fbin;
 
@@ -124,6 +125,7 @@ int main(int argc, char **argv)
 		printf("--patternsha256size=0x<hexval> See --patterntype.\n");
 		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
 		printf("--findtarget=0x<hexval> Stop searching once this number of matches were found, by default this is 0x1. When this is 0x0, this will not stop until the end of the binary is reached.\n");
+		printf("--baseaddr=0x<hexval> This is the value which is added to the located offset when printing it, by default this is 0x0.\n");
 
 		return 0;
 	}
@@ -177,6 +179,11 @@ int main(int argc, char **argv)
 		if(strncmp(argv[argi], "--findtarget=", 13)==0)
 		{
 			sscanf(&argv[argi][13], "0x%x", &findtarget);
+		}
+
+		if(strncmp(argv[argi], "--baseaddr=", 11)==0)
+		{
+			sscanf(&argv[argi][11], "0x%x", &baseaddr);
 		}
 
 		if(ret!=0)break;
@@ -304,7 +311,7 @@ int main(int argc, char **argv)
 
 		if(tmpval)
 		{
-			printf("Found the pattern at 0x%x.\n", (unsigned int)pos);
+			printf("Found the pattern at 0x%x.\n", ((unsigned int)pos) + baseaddr);
 			found++;
 			if(found==findtarget)break;
 		}
