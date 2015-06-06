@@ -98,6 +98,7 @@ int main(int argc, char **argv)
 {
 	int argi;
 	int ret;
+	int patterntype = -1;
 	int hashpattern_set = 0;
 	unsigned int found, findtarget=1;
 	unsigned char *filebuf = NULL;
@@ -118,6 +119,7 @@ int main(int argc, char **argv)
 		printf("Usage:\n");
 		printf("ropgadget_patternfinder <binary path> <options>\n");
 		printf("Options:\n");
+		printf("--patterntype=<type> Selects the pattern-type, which must be one of the following(this option is required): sha256.\n");
 		printf("--patternsha256=<bindata> Hash every --patternsha256size bytes in the binary, for locating the target pattern. The input bindata(sha256 hash) size must be 0x20-bytes.\n");
 		printf("--patternsha256size=0x<hexval> See --patternsha256.\n");
 		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
@@ -130,6 +132,19 @@ int main(int argc, char **argv)
 
 	for(argi=2; argi<argc; argi++)
 	{
+		if(strncmp(argv[argi], "--patterntype=", 14)==0)
+		{
+			if(strncmp(&argv[argi][14], "sha256", 6)==0)
+			{
+				patterntype = 0;
+			}
+			else
+			{
+				printf("Invalid pattern-type.\n");
+				ret = 5;
+			}
+		}
+
 		if(strncmp(argv[argi], "--patternsha256=", 16)==0)
 		{
 			if(strlen(&argv[argi][16]) != 0x20*2)
@@ -167,15 +182,15 @@ int main(int argc, char **argv)
 
 	if(ret!=0)return ret;
 
-	if(hashpattern_set && hashblocksize==0)
+	if(patterntype==-1)
 	{
-		printf("--patternsha256size must be used when --patternsha256 is used.\n");
+		printf("No pattern-type specified.\n");
 		return 5;
 	}
 
-	if(!hashpattern_set)
+	if(patterntype==0 && (hashpattern_set && hashblocksize==0))
 	{
-		printf("No pattern specified.\n");
+		printf("--patternsha256size must be used when --patternsha256 is used.\n");
 		return 5;
 	}
 
