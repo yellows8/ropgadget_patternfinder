@@ -7,6 +7,17 @@
 
 //Build with: gcc -o ropgadget_patternfinder ropgadget_patternfinder.c -lcrypto
 
+int patterntype = -1;
+unsigned int findtarget=1;
+unsigned int stride = 4;
+unsigned int baseaddr = 0;
+int plainout = 0;
+unsigned char *filebuf = NULL, *patterndata = NULL, *patternmask = NULL;
+size_t filebufsz=0, hashblocksize=0;
+size_t patterndata_size=0, patternmask_size=0;
+
+char line_prefix[256];
+
 int load_bindata(char *arg, unsigned char **buf, unsigned int *size)
 {
 	int i;
@@ -94,20 +105,91 @@ int load_bindata(char *arg, unsigned char **buf, unsigned int *size)
 	return 0;
 }
 
+int locate_pattern()
+{
+	int ret;
+	size_t pos, i;
+	unsigned int found, found2;
+	unsigned int tmpval, tmpval2;
+
+	unsigned char calchash[0x20];
+
+	for(pos=0; pos<filebufsz; pos+=stride)
+	{
+		tmpval = 0;
+
+		if(patterntype==0)
+		{
+			if(filebufsz - pos < hashblocksize)break;
+
+			SHA256(&filebuf[pos], hashblocksize, calchash);
+			if(memcmp(patterndata, calchash, 0x20)==0)
+			{
+				tmpval = 1;
+			}
+		}
+		else if(patterntype==1)
+		{
+			if(filebufsz - pos < patterndata_size)break;
+
+			
+
+			if(patternmask==NULL)
+			{
+				if(memcmp(patterndata, &filebuf[pos], patterndata_size)==0)
+				{
+					tmpval = 1;
+				}
+			}
+			else
+			{
+				found2 = 1;
+
+				for(i=0; i<patterndata_size; i++)
+				{
+					tmpval2 = filebuf[pos+i];
+					if(i<patternmask_size)tmpval2 &= patternmask[i];
+
+					if(tmpval2 != patterndata[i])
+					{
+						found2 = 0;
+						break;
+					}
+				}
+
+				if(found2)tmpval = 1;
+			}
+		}
+
+		if(tmpval)
+		{
+			if(!plainout)printf("Found the pattern at ");
+			printf("%s0x%x", line_prefix, ((unsigned int)pos) + baseaddr);
+			if(!plainout)printf(".");
+			printf("\n");
+			found++;
+			if(found==findtarget)break;
+		}
+	}
+
+	if(!found)
+	{
+		printf("Failed to find the pattern.\n");
+		ret = 7;
+	}
+	else
+	{
+		if(!plainout)printf("Found 0x%x matches.\n", found);
+	}
+
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	int argi;
 	int ret;
-	int patterntype = -1;
-	unsigned int found, found2, findtarget=1;
-	unsigned char *filebuf = NULL, *patterndata = NULL, *patternmask = NULL;
-	unsigned char calchash[0x20];
-	size_t filebufsz=0, pos, i, hashblocksize=0;
-	size_t patterndata_size=0, patternmask_size=0;
 	unsigned int tmpsize=0;
-	unsigned int stride = 4;
-	unsigned int tmpval, tmpval2;
-	unsigned int baseaddr = 0;
 	struct stat filestat;
 	FILE *fbin;
 
@@ -115,7 +197,7 @@ int main(int argc, char **argv)
 	{
 		printf("ropgadget_patternfinder by yellows8.\n");
 		printf("Locates the offset/address of the specified pattern in the input binary. This tool is mainly intended for locating ROP-gadgets, but it could be used for other purposes as well.\n");
-		printf("<bindata> below can be either hex with any byte-length(unless specified otherwise), or '@' followed by a file-path to load the data from.");
+		printf("<bindata> below can be either hex with any byte-length(unless specified otherwise), or '@' followed by a file-path to load the data from.\n");
 		printf("Usage:\n");
 		printf("ropgadget_patternfinder <binary path> <options>\n");
 		printf("Options:\n");
@@ -126,11 +208,14 @@ int main(int argc, char **argv)
 		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
 		printf("--findtarget=0x<hexval> Stop searching once this number of matches were found, by default this is 0x1. When this is 0x0, this will not stop until the end of the binary is reached.\n");
 		printf("--baseaddr=0x<hexval> This is the value which is added to the located offset when printing it, by default this is 0x0.\n");
+		printf("--plainout[=<prefix text>] Only print the located offset/address, unless an error occurs. If '=<text>' is specified, print that before printing the located offset/address.\n");
 
 		return 0;
 	}
 
 	ret = 0;
+
+	memset(line_prefix, 0, sizeof(line_prefix));
 
 	for(argi=2; argi<argc; argi++)
 	{
@@ -184,6 +269,15 @@ int main(int argc, char **argv)
 		if(strncmp(argv[argi], "--baseaddr=", 11)==0)
 		{
 			sscanf(&argv[argi][11], "0x%x", &baseaddr);
+		}
+
+		if(strncmp(argv[argi], "--plainout", 10)==0)
+		{
+			plainout = 1;
+			if(argv[argi][10] == '=')
+			{
+				strncpy(line_prefix, &argv[argi][11], sizeof(line_prefix)-1);
+			}
 		}
 
 		if(ret!=0)break;
@@ -259,73 +353,7 @@ int main(int argc, char **argv)
 
 	fclose(fbin);
 
-	found = 0;
-	ret = 0;
-
-	for(pos=0; pos<filebufsz; pos+=stride)
-	{
-		tmpval = 0;
-
-		if(patterntype==0)
-		{
-			if(filebufsz - pos < hashblocksize)break;
-
-			SHA256(&filebuf[pos], hashblocksize, calchash);
-			if(memcmp(patterndata, calchash, 0x20)==0)
-			{
-				tmpval = 1;
-			}
-		}
-		else if(patterntype==1)
-		{
-			if(filebufsz - pos < patterndata_size)break;
-
-			
-
-			if(patternmask==NULL)
-			{
-				if(memcmp(patterndata, &filebuf[pos], patterndata_size)==0)
-				{
-					tmpval = 1;
-				}
-			}
-			else
-			{
-				found2 = 1;
-
-				for(i=0; i<patterndata_size; i++)
-				{
-					tmpval2 = filebuf[pos+i];
-					if(i<patternmask_size)tmpval2 &= patternmask[i];
-
-					if(tmpval2 != patterndata[i])
-					{
-						found2 = 0;
-						break;
-					}
-				}
-
-				if(found2)tmpval = 1;
-			}
-		}
-
-		if(tmpval)
-		{
-			printf("Found the pattern at 0x%x.\n", ((unsigned int)pos) + baseaddr);
-			found++;
-			if(found==findtarget)break;
-		}
-	}
-
-	if(!found)
-	{
-		printf("Failed to find the pattern.\n");
-		ret = 7;
-	}
-	else
-	{
-		printf("Found 0x%x matches.\n", found);
-	}
+	ret = locate_pattern();
 
 	free(filebuf);
 	free(patterndata);
