@@ -16,6 +16,8 @@ unsigned char *filebuf = NULL, *patterndata = NULL, *patternmask = NULL;
 size_t filebufsz=0, hashblocksize=0;
 size_t patterndata_size=0, patternmask_size=0;
 
+unsigned int dataload_offset = 0, dataload_enabled = 0;
+
 int enable_script = 0;
 
 char line_prefix[256];
@@ -210,6 +212,12 @@ int parse_param(char *param, int type)
 		sscanf(&param[11], "0x%x", &baseaddr);
 	}
 
+	if(strncmp(param, "--dataload=", 11)==0)
+	{
+		dataload_enabled = 1;
+		sscanf(&param[11], "0x%x", &dataload_offset);
+	}
+
 	if(strncmp(param, "--plainout", 10)==0)
 	{
 		plainout = 1;
@@ -315,9 +323,26 @@ int locate_pattern()
 
 		if(tmpval)
 		{
-			if(!plainout)printf("Found the pattern at ");
-			printf("%s0x%x", line_prefix, ((unsigned int)pos) + baseaddr);
-			if(!plainout)printf(".");
+			if(!dataload_enabled)
+			{
+				if(!plainout)printf("Found the pattern at ");
+				printf("%s0x%x", line_prefix, ((unsigned int)pos) + baseaddr);
+				if(!plainout)printf(".");
+			}
+			else
+			{
+				if(!plainout)
+				{
+					printf("Found the pattern at ");
+					printf("%s0x%x", line_prefix, ((unsigned int)pos) + baseaddr);
+					printf(", u32 value at +0x%x: 0x%x.", dataload_offset, *((unsigned int*)&filebuf[((unsigned int)pos) + dataload_offset]));
+				}
+				else
+				{
+					printf("%s0x%x", line_prefix, *((unsigned int*)&filebuf[((unsigned int)pos) + dataload_offset]));
+				}
+			}
+
 			printf("\n");
 			found++;
 			if(found==findtarget)break;
@@ -366,6 +391,12 @@ int parse_script(FILE *fscript)
 			patternmask = NULL;
 			patternmask_size=0;
 		}
+
+		dataload_enabled = 0;
+		dataload_offset = 0;
+
+		plainout = 0;
+		memset(line_prefix, 0, sizeof(line_prefix));
 
 		while(*strptr)
 		{
@@ -454,8 +485,9 @@ int main(int argc, char **argv)
 		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
 		printf("--findtarget=0x<hexval> Stop searching once this number of matches were found, by default this is 0x1. When this is 0x0, this will not stop until the end of the binary is reached.\n");
 		printf("--baseaddr=0x<hexval> This is the value which is added to the located offset when printing it, by default this is 0x0.\n");
+		printf("--dataload=0x<hexval> When used, the u32 at the specified offset relative to the located pattern location, is returned instead of the pattern offset. --baseaddr does not apply to the loaded value.\n");
 		printf("--plainout[=<prefix text>] Only print the located offset/address, unless an error occurs. If '=<text>' is specified, print that before printing the located offset/address.\n");
-		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, and --findtarget. When beginning processing each line, the --patterndatamask is reset to the default before parsing the params each time.\n");
+		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, and --findtarget. When beginning processing each line, the --patterndatamask, --dataload, and --plainout state is reset to the default before parsing the params each time.\n");
 
 		return 0;
 	}
