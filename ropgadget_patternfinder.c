@@ -277,10 +277,23 @@ int locate_pattern()
 {
 	int ret=0;
 	size_t pos, i;
-	unsigned int found, found2;
+	unsigned int found=0, found2=0;
 	unsigned int tmpval, tmpval2;
+	unsigned char *tmpbuf = NULL;
 
 	unsigned char calchash[0x20];
+
+	if(patterntype==0 && patternmask)
+	{
+		tmpbuf = malloc(hashblocksize);
+		if(tmpbuf==NULL)
+		{
+			printf("Failed to alloc tmpbuf in locate_pattern().\n");
+			return 8;
+		}
+
+		memset(tmpbuf, 0, hashblocksize);
+	}
 
 	for(pos=0; pos<filebufsz; pos+=stride)
 	{
@@ -290,7 +303,22 @@ int locate_pattern()
 		{
 			if(filebufsz - pos < hashblocksize)break;
 
-			SHA256(&filebuf[pos], hashblocksize, calchash);
+			if(patternmask==NULL)
+			{
+				SHA256(&filebuf[pos], hashblocksize, calchash);
+			}
+			else
+			{
+				memcpy(tmpbuf, &filebuf[pos], hashblocksize);
+
+				for(i=0; i<hashblocksize; i++)
+				{
+					if(i<patternmask_size)tmpbuf[i] &= patternmask[i];
+				}
+
+				SHA256(tmpbuf, hashblocksize, calchash);
+			}
+
 			if(memcmp(patterndata, calchash, 0x20)==0)
 			{
 				tmpval = 1;
@@ -370,6 +398,8 @@ int locate_pattern()
 	{
 		if(!plainout)printf("Found 0x%x matches.\n", found);
 	}
+
+	if(patterntype==0 && patternmask)free(tmpbuf);
 
 	return ret;
 }
@@ -498,7 +528,7 @@ int main(int argc, char **argv)
 		printf("Options:\n");
 		printf("--patterntype=<type> Selects the pattern-type, which must be one of the following(this option is required): sha256 or datacmp. sha256: Hash every --patternsha256size bytes in the binary, for locating the target pattern. The input bindata(sha256 hash) size must be 0x20-bytes.\n");
 		printf("--patterndata=<bindata> Pattern data to use during searching the binary, see --patterntype.\n");
-		printf("--patterndatamask=<bindata> Mask data to use with pattern-type datacmp. The byte-size can be less than the size of patterndata as well. The data loaded from the filebuf is &= with this mask data.\n");
+		printf("--patterndatamask=<bindata> Mask data to use with the data loaded from the file. The byte-size can be less than the size of patterndata / patternsha256size as well. The data loaded from the filebuf is &= with this mask data.\n");
 		printf("--patternsha256size=0x<hexval> See --patterntype.\n");
 		printf("--stride=0x<hexval> In the search loop, this is the value that the pos is increased by at the end of each interation. By default this is 0x4.\n");
 		printf("--findtarget=0x<hexval> Stop searching once this number of matches were found, by default this is 0x1. When this is 0x0, this will not stop until the end of the binary is reached.\n");
