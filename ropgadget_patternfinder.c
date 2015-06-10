@@ -335,7 +335,7 @@ int locate_pattern()
 				tmpval+= addval;
 
 				if(!plainout)printf("Found the pattern at(value added with 0x%x) ", addval);
-				printf("%s0x%x", line_prefix, tmpval);
+				printf("%s0x%08x", line_prefix, tmpval);
 				if(!plainout)printf(".");
 			}
 			else
@@ -346,12 +346,12 @@ int locate_pattern()
 				if(!plainout)
 				{
 					printf("Found the pattern at ");
-					printf("%s0x%x", line_prefix, ((unsigned int)pos) + baseaddr);
+					printf("%s0x%08x", line_prefix, ((unsigned int)pos) + baseaddr);
 					printf(", u32 value at +0x%x, value added with 0x%x: 0x%x.", dataload_offset, addval, tmpval);
 				}
 				else
 				{
-					printf("%s0x%x", line_prefix, tmpval);
+					printf("%s0x%08x", line_prefix, tmpval);
 				}
 			}
 
