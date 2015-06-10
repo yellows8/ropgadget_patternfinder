@@ -393,7 +393,11 @@ int parse_script(FILE *fscript)
 		strptr = strchr(linebuf, '\n');
 		if(strptr)*strptr = 0;
 
-		if(strlen(linebuf)==0)continue;
+		if(strlen(linebuf)==0 || linebuf[0]=='#')
+		{
+			if(linebuf[0]==0)printf("\n");
+			continue;
+		}
 
 		strptr = linebuf;
 
@@ -502,7 +506,7 @@ int main(int argc, char **argv)
 		printf("--dataload=0x<hexval> When used, the u32 at the specified offset relative to the located pattern location, is returned instead of the pattern offset. --baseaddr does not apply to the loaded value.\n");
 		printf("--addval=0x<hexval> Add the specified value to the value which gets printed.\n");
 		printf("--plainout[=<prefix text>] Only print the located offset/address, unless an error occurs. If '=<text>' is specified, print that before printing the located offset/address.\n");
-		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, and --findtarget. When beginning processing each line, the --patterndatamask, --dataload, --addval, and --plainout state is reset to the default before parsing the params each time.\n");
+		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, and --findtarget. When beginning processing each line, the --patterndatamask, --dataload, --addval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
 
 		return 0;
 	}
