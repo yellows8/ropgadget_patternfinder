@@ -422,6 +422,8 @@ int parse_script(FILE *fscript)
 
 		strptr = strchr(linebuf, '\n');
 		if(strptr)*strptr = 0;
+		strptr = strchr(linebuf, '\r');
+		if(strptr)*strptr = 0;
 
 		if(strlen(linebuf)==0 || linebuf[0]=='#')
 		{
