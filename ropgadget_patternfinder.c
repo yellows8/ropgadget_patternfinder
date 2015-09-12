@@ -12,6 +12,7 @@ unsigned int findtarget=1;
 unsigned int stride = 4;
 unsigned int baseaddr = 0;
 int plainout = 0;
+int disable_locatefail_halt = 0;
 unsigned char *filebuf = NULL, *patterndata = NULL, *patternmask = NULL;
 size_t filebufsz=0, hashblocksize=0;
 size_t patterndata_size=0, patternmask_size=0;
@@ -22,6 +23,7 @@ unsigned int addval=0;
 int enable_script = 0;
 
 char line_prefix[256];
+char line_suffix[256];
 char script_path[1024];
 
 void hexdump(void *ptr, int buflen)//From ctrtool.
@@ -233,6 +235,10 @@ int parse_param(char *param, int type)
 		}
 	}
 
+	if(strncmp(param, "--plainsuffix=", 14)==0)strncpy(line_suffix, &param[14], sizeof(line_suffix)-1);
+
+	if(strncmp(param, "--disablelocatehalt", 19)==0)disable_locatefail_halt = 1;
+
 	if(type==0 && strncmp(param, "--script", 8)==0)
 	{
 		enable_script = 1;
@@ -363,7 +369,7 @@ int locate_pattern()
 				tmpval+= addval;
 
 				if(!plainout)printf("Found the pattern at(value added with 0x%x) ", addval);
-				printf("%s0x%08x", line_prefix, tmpval);
+				printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
 				if(!plainout)printf(".");
 			}
 			else
@@ -379,7 +385,7 @@ int locate_pattern()
 				}
 				else
 				{
-					printf("%s0x%08x", line_prefix, tmpval);
+					printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
 				}
 			}
 
@@ -392,7 +398,7 @@ int locate_pattern()
 	if(!found)
 	{
 		printf("Failed to find the pattern.\n");
-		ret = 7;
+		if(!disable_locatefail_halt)ret = 7;
 	}
 	else
 	{
@@ -538,7 +544,9 @@ int main(int argc, char **argv)
 		printf("--dataload=0x<hexval> When used, the u32 at the specified offset relative to the located pattern location, is returned instead of the pattern offset. --baseaddr does not apply to the loaded value.\n");
 		printf("--addval=0x<hexval> Add the specified value to the value which gets printed.\n");
 		printf("--plainout[=<prefix text>] Only print the located offset/address, unless an error occurs. If '=<text>' is specified, print that before printing the located offset/address.\n");
-		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, and --findtarget. When beginning processing each line, the --patterndatamask, --dataload, --addval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
+		printf("--plainsuffix=[suffix text] When --plainout was used, print the specified text immediately after printing the located offset/address.\n");
+		printf("--disablelocatehalt When the pattern wasn't found, don't return an error + immediately exit.\n");
+		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, --findtarget, and --plainsuffix. When beginning processing each line, the --patterndatamask, --dataload, --addval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
 
 		return 0;
 	}
@@ -546,6 +554,7 @@ int main(int argc, char **argv)
 	ret = 0;
 
 	memset(line_prefix, 0, sizeof(line_prefix));
+	memset(line_suffix, 0, sizeof(line_suffix));
 	memset(script_path, 0, sizeof(script_path));
 
 	for(argi=2; argi<argc; argi++)
