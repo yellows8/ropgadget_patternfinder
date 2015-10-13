@@ -19,6 +19,7 @@ size_t patterndata_size=0, patternmask_size=0;
 
 unsigned int dataload_offset = 0, dataload_enabled = 0;
 unsigned int addval=0;
+unsigned int printrawval = 0;
 
 int enable_script = 0;
 
@@ -237,6 +238,8 @@ int parse_param(char *param, int type)
 
 	if(strncmp(param, "--plainsuffix=", 14)==0)strncpy(line_suffix, &param[14], sizeof(line_suffix)-1);
 
+	if(strncmp(param, "--printrawval", 13)==0)printrawval = 1;
+
 	if(strncmp(param, "--disablelocatehalt", 19)==0)disable_locatefail_halt = 1;
 
 	if(type==0 && strncmp(param, "--script", 8)==0)
@@ -369,7 +372,14 @@ int locate_pattern()
 				tmpval+= addval;
 
 				if(!plainout)printf("Found the pattern at(value added with 0x%x) ", addval);
-				printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
+				if(!printrawval)
+				{
+					printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
+				}
+				else
+				{
+					printf("%s%02x%02x%02x%02x%s", line_prefix, (tmpval & 0xff), (tmpval>>8) & 0xff, (tmpval>>16) & 0xff, (tmpval>>24) & 0xff, line_suffix);
+				}
 				if(!plainout)printf(".");
 			}
 			else
@@ -385,7 +395,14 @@ int locate_pattern()
 				}
 				else
 				{
-					printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
+					if(!printrawval)
+					{
+						printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
+					}
+					else
+					{
+						printf("%s%02x%02x%02x%02x%s", line_prefix, (tmpval & 0xff), (tmpval>>8) & 0xff, (tmpval>>16) & 0xff, (tmpval>>24) & 0xff, line_suffix);
+					}
 				}
 			}
 
@@ -453,6 +470,7 @@ int parse_script(FILE *fscript)
 		memset(line_prefix, 0, sizeof(line_prefix));
 
 		addval = 0;
+		printrawval = 0;
 
 		while(*strptr)
 		{
@@ -545,8 +563,9 @@ int main(int argc, char **argv)
 		printf("--addval=0x<hexval> Add the specified value to the value which gets printed.\n");
 		printf("--plainout[=<prefix text>] Only print the located offset/address, unless an error occurs. If '=<text>' is specified, print that before printing the located offset/address.\n");
 		printf("--plainsuffix=[suffix text] When --plainout was used, print the specified text immediately after printing the located offset/address.\n");
+		printf("--printrawval Instead of printing 0x<val> for the final value, print the raw bytes in little-endian form.\n");
 		printf("--disablelocatehalt When the pattern wasn't found, don't return an error + immediately exit.\n");
-		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, --findtarget, and --plainsuffix. When beginning processing each line, the --patterndatamask, --dataload, --addval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
+		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, --findtarget, and --plainsuffix. When beginning processing each line, the --patterndatamask, --dataload, --addval, --printrawval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
 
 		return 0;
 	}
