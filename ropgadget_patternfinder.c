@@ -21,6 +21,9 @@ unsigned int dataload_offset = 0, dataload_enabled = 0;
 unsigned int addval=0;
 unsigned int printrawval = 0;
 
+int blacklist_set = 0;
+unsigned int blacklist_addrs[2] = {0};
+
 int enable_script = 0;
 
 char line_prefix[256];
@@ -222,6 +225,12 @@ int parse_param(char *param, int type)
 		sscanf(&param[11], "0x%x", &dataload_offset);
 	}
 
+	if(strncmp(param, "--blacklist=", 12)==0)
+	{
+		blacklist_set = 1;
+		sscanf(&param[12], "0x%x-0x%x", &blacklist_addrs[0], &blacklist_addrs[1]);
+	}
+
 	if(strncmp(param, "--addval=", 9)==0)
 	{
 		sscanf(&param[9], "0x%x", &addval);
@@ -280,6 +289,16 @@ int verify_params_state()
 	}
 
 	return ret;
+}
+
+unsigned int check_address_allowed(unsigned int address)
+{
+	if(blacklist_set)
+	{
+		if(address >= blacklist_addrs[0] && address < blacklist_addrs[1])return 0;
+	}
+
+	return 1;
 }
 
 int locate_pattern()
@@ -366,35 +385,18 @@ int locate_pattern()
 
 		if(tmpval)
 		{
+			found2 = 0;
+
 			if(!dataload_enabled)
 			{
 				tmpval = ((unsigned int)pos) + baseaddr;
 				tmpval+= addval;
 
-				if(!plainout)printf("Found the pattern at(value added with 0x%x) ", addval);
-				if(!printrawval)
-				{
-					printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
-				}
-				else
-				{
-					printf("%s%02x%02x%02x%02x%s", line_prefix, (tmpval & 0xff), (tmpval>>8) & 0xff, (tmpval>>16) & 0xff, (tmpval>>24) & 0xff, line_suffix);
-				}
-				if(!plainout)printf(".");
-			}
-			else
-			{
-				tmpval = *((unsigned int*)&filebuf[((unsigned int)pos) + dataload_offset]);
-				tmpval+= addval;
+				found2 = check_address_allowed(tmpval);
 
-				if(!plainout)
+				if(found2)
 				{
-					printf("Found the pattern at ");
-					printf("%s0x%08x", line_prefix, ((unsigned int)pos) + baseaddr);
-					printf(", u32 value at +0x%x, value added with 0x%x: 0x%x.", dataload_offset, addval, tmpval);
-				}
-				else
-				{
+					if(!plainout)printf("Found the pattern at(value added with 0x%x) ", addval);
 					if(!printrawval)
 					{
 						printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
@@ -403,12 +405,44 @@ int locate_pattern()
 					{
 						printf("%s%02x%02x%02x%02x%s", line_prefix, (tmpval & 0xff), (tmpval>>8) & 0xff, (tmpval>>16) & 0xff, (tmpval>>24) & 0xff, line_suffix);
 					}
+					if(!plainout)printf(".");
+				}
+			}
+			else
+			{
+				tmpval = *((unsigned int*)&filebuf[((unsigned int)pos) + dataload_offset]);
+				tmpval+= addval;
+
+				found2 = check_address_allowed(tmpval);
+
+				if(found2)
+				{
+					if(!plainout)
+					{
+						printf("Found the pattern at ");
+						printf("%s0x%08x", line_prefix, ((unsigned int)pos) + baseaddr);
+						printf(", u32 value at +0x%x, value added with 0x%x: 0x%x.", dataload_offset, addval, tmpval);
+					}
+					else
+					{
+						if(!printrawval)
+						{
+							printf("%s0x%08x%s", line_prefix, tmpval, line_suffix);
+						}
+						else
+						{
+							printf("%s%02x%02x%02x%02x%s", line_prefix, (tmpval & 0xff), (tmpval>>8) & 0xff, (tmpval>>16) & 0xff, (tmpval>>24) & 0xff, line_suffix);
+						}
+					}
 				}
 			}
 
-			printf("\n");
-			found++;
-			if(found==findtarget)break;
+			if(found2)
+			{
+				printf("\n");
+				found++;
+				if(found==findtarget)break;
+			}
 		}
 	}
 
@@ -560,12 +594,13 @@ int main(int argc, char **argv)
 		printf("--findtarget=0x<hexval> Stop searching once this number of matches were found, by default this is 0x1. When this is 0x0, this will not stop until the end of the binary is reached.\n");
 		printf("--baseaddr=0x<hexval> This is the value which is added to the located offset when printing it, by default this is 0x0.\n");
 		printf("--dataload=0x<hexval> When used, the u32 at the specified offset relative to the located pattern location, is returned instead of the pattern offset. --baseaddr does not apply to the loaded value.\n");
+		printf("--blacklist=0x<hexval-start>-0x<hexval-end> When used, any final located output addresses under the specified blacklisted range are ignored.\n");
 		printf("--addval=0x<hexval> Add the specified value to the value which gets printed.\n");
 		printf("--plainout[=<prefix text>] Only print the located offset/address, unless an error occurs. If '=<text>' is specified, print that before printing the located offset/address.\n");
 		printf("--plainsuffix=[suffix text] When --plainout was used, print the specified text immediately after printing the located offset/address.\n");
 		printf("--printrawval Instead of printing 0x<val> for the final value, print the raw bytes in little-endian form.\n");
 		printf("--disablelocatehalt When the pattern wasn't found, don't return an error + immediately exit.\n");
-		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, --findtarget, and --plainsuffix. When beginning processing each line, the --patterndatamask, --dataload, --addval, --printrawval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
+		printf("--script=<path> Specifies a script from which to load params from(identical to the cmd-line params), each line is for a different pattern to search for. Each param applies to the current line, and all the lines after that until that param gets specified on another line again. When '=<path>' isn't specified, the script is read from stdin. When this --script option is used, all input-param state is reset to the defaults, except for --patterntype, --baseaddr, --findtarget, --plainsuffix, and --blacklist. When beginning processing each line, the --patterndatamask, --dataload, --addval, --printrawval, and --plainout state is reset to the default before parsing the params each time. When a line is empty, a newline will be printed then processing will skip to the next line. When the first char of a line is '#'(comment), processing will just skip to the next line.\n");
 
 		return 0;
 	}
